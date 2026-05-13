@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>財神到！百萬大轉盤</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #d32f2f; /* 喜慶紅 */
+            font-family: "Microsoft JhengHei", sans-serif;
+            overflow-x: hidden;
+        }
+
+        /* 裝飾背景 */
+        .decoration {
+            position: fixed;
+            font-size: 50px;
+            z-index: -1;
+            opacity: 0.8;
+        }
+        .god-of-wealth { top: 20px; left: 20px; font-size: 80px; }
+        .red-packet { bottom: 20px; right: 20px; font-size: 60px; transform: rotate(15deg); }
+
+        h1 {
+            color: #ffeb3b;
+            text-shadow: 2px 2px 4px #000;
+            margin-bottom: 20px;
+            font-size: 28px;
+        }
+
+        /* 轉盤容器 */
+        .wheel-container {
+            position: relative;
+            width: 320px;
+            height: 320px;
+            border: 10px solid #ffca28;
+            border-radius: 50%;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            background: #fff;
+        }
+
+        /* 指針 */
+        .pointer {
+            position: absolute;
+            top: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 40px;
+            height: 50px;
+            background: #ffeb3b;
+            clip-path: polygon(50% 100%, 0 0, 100% 0);
+            z-index: 10;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            transition: transform 5s cubic-bezier(0.15, 0, 0.15, 1);
+        }
+
+        button {
+            margin-top: 30px;
+            padding: 15px 40px;
+            font-size: 20px;
+            font-weight: bold;
+            color: #d32f2f;
+            background: #ffeb3b;
+            border: none;
+            border-radius: 30px;
+            cursor: pointer;
+            box-shadow: 0 4px 0 #f57f17;
+            transition: 0.2s;
+        }
+
+        button:active {
+            transform: translateY(4px);
+            box-shadow: none;
+        }
+
+        /* 彈出視窗 */
+        #resultModal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #fff;
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            z-index: 100;
+            border: 5px solid #ffca28;
+            width: 80%;
+            max-width: 300px;
+        }
+
+        .overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 99;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="decoration god-of-wealth">🎅</div> <div class="decoration red-packet">🧧</div>
+
+    <h1>💰 恭喜發財大抽獎 💰</h1>
+
+    <div class="wheel-container">
+        <div class="pointer"></div>
+        <canvas id="wheelCanvas" width="500" height="500"></canvas>
+    </div>
+
+    <button onclick="spin()">開始轉動</button>
+
+    <div class="overlay" id="overlay"></div>
+    <div id="resultModal">
+        <h2 style="color: #d32f2f;">🎊 恭喜中獎！ 🎊</h2>
+        <p style="font-size: 24px; font-weight: bold;">一百萬元</p>
+        <p>🧧🧧🧧</p>
+        <button onclick="location.reload()">再玩一次</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('wheelCanvas');
+        const ctx = canvas.getContext('2d');
+        const prizes = ["十元", "一百", "五百", "一千", "一萬", "十萬", "五十萬", "一百萬"];
+        const colors = ["#ff5252", "#fb8c00", "#ff5252", "#fb8c00", "#ff5252", "#fb8c00", "#ff5252", "#fb8c00"];
+        
+        const numPrizes = prizes.length;
+        const arc = Math.PI * 2 / numPrizes;
+
+        // 繪製轉盤
+        function drawWheel() {
+            for (let i = 0; i < numPrizes; i++) {
+                const angle = i * arc;
+                ctx.fillStyle = colors[i];
+                ctx.beginPath();
+                ctx.moveTo(250, 250);
+                ctx.arc(250, 250, 250, angle, angle + arc);
+                ctx.fill();
+                ctx.strokeStyle = "#fff";
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // 文字
+                ctx.save();
+                ctx.translate(250, 250);
+                ctx.rotate(angle + arc / 2);
+                ctx.textAlign = "right";
+                ctx.fillStyle = "#fff";
+                ctx.font = "bold 30px Microsoft JhengHei";
+                ctx.fillText(prizes[i], 230, 10);
+                ctx.restore();
+            }
+        }
+
+        function spin() {
+            const wheel = document.getElementById('wheelCanvas');
+            
+            // 設定目標：一百萬在數組的最後一個索引 (7)
+            // 轉盤旋轉計算：
+            // 我們要讓「一百萬」停在上方指針處（12點鐘方向為 -90度 或 270度）
+            // 由於 JavaScript 繪圖起點是 3點鐘方向，目標索引 7 是最後一格
+            
+            const targetIndex = 7; 
+            const rounds = 10; // 旋轉圈數
+            const segmentDeg = 360 / numPrizes;
+            
+            // 計算讓 targetIndex 停在頂部的角度
+            // 轉動角度 = 圈數 + 偏移量
+            const finalAngle = (rounds * 360) + (360 - (targetIndex * segmentDeg)) - (segmentDeg / 2) - 90;
+
+            wheel.style.transform = `rotate(${finalAngle}deg)`;
+
+            setTimeout(() => {
+                document.getElementById('overlay').style.display = 'block';
+                document.getElementById('resultModal').style.display = 'block';
+            }, 5500);
+        }
+
+        drawWheel();
+    </script>
+</body>
+</html>
